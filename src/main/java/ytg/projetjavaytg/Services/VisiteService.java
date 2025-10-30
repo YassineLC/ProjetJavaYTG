@@ -21,11 +21,7 @@ public class VisiteService {
     }
 
     public List<Visite> getAllVisites() {
-        List<Visite>  visites = visiteRepository.findAll();
-        if (visites.isEmpty()){
-            throw new RuntimeException("Aucune visite en base");
-        }
-        return visites;
+        return visiteRepository.findAll();
     }
 
     public Optional<Visite> getVisiteById(Long id) {

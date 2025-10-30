@@ -99,9 +99,7 @@
             </div>
         </div>
 
-        <div th:if="${apprentis.isEmpty()}" class="alert-empty">
-            Aucun apprenti trouvé dans la base de données
-        </div>
+        <div th:if="${message}" class="alert alert-info" th:text="${message}"></div>
 
         <div th:if="${!apprentis.isEmpty()}" class="table-container">
             <table class="apprentis-table">

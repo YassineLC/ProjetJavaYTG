@@ -42,7 +42,9 @@ public class RechercheViewController {
         model.addAttribute("username", SecurityUtils.getCurrentUserPrenom());
 
         List<Apprenti> tousLesApprentis = apprentiService.getAllApprentis();
-
+        if (tousLesApprentis.isEmpty()) {
+            model.addAttribute("message", "Aucun apprenti trouvé.");
+        }
         // Application des filtres
         List<Apprenti> apprentisFiltres = tousLesApprentis.stream()
                 .filter(apprenti -> {
