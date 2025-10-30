@@ -1,80 +1,61 @@
 package ytg.projetjavaytg.exception;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.web.bind.annotation.ControllerAdvice;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 
-import java.time.LocalDateTime;
+import jakarta.servlet.http.HttpServletRequest;
+import java.time.OffsetDateTime;
 import java.util.stream.Collectors;
 
-@ControllerAdvice
+/**
+ * Handler global pour les contrôleurs REST (JSON).
+ * IMPORTANT: @RestControllerAdvice => ne s'applique pas aux pages Thymeleaf.
+ */
+@RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
-
-    private ApiError buildApiError(HttpStatus status, String message) {
-        ApiError apiError = new ApiError();
-        apiError.setTimestamp(LocalDateTime.now());
-        apiError.setStatus(status.value());
-        apiError.setCode(status.value());
-        apiError.setError(status.getReasonPhrase());
-        apiError.setMessage(message);
-        return apiError;
-    }
-
     @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<ApiError> handleNotFound(ResourceNotFoundException ex) {
-        ApiError apiError = buildApiError(HttpStatus.NOT_FOUND, ex.getMessage());
-        return new ResponseEntity<>(apiError, HttpStatus.NOT_FOUND);
+    public ResponseEntity<ApiError> handleNotFound(ResourceNotFoundException ex, HttpServletRequest req) {
+        return build(HttpStatus.NOT_FOUND, ex.getMessage(), req);
     }
 
     @ExceptionHandler(BadRequestException.class)
-    public ResponseEntity<ApiError> handleBadRequest(BadRequestException ex) {
-        ApiError apiError = buildApiError(HttpStatus.BAD_REQUEST, ex.getMessage());
-        return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
-    }
-
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ApiError> handleValidation(MethodArgumentNotValidException ex) {
-        String errors = ex.getBindingResult().getFieldErrors().stream()
-                .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
-                .collect(Collectors.joining(", "));
-        ApiError apiError = buildApiError(HttpStatus.BAD_REQUEST, "Validation failed: " + errors);
-        return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
-    }
-
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ApiError> handleBadRequests(HttpMessageNotReadableException ex) {
-        logger.warn("HttpMessageNotReadable: {}", ex.getMessage());
-        ApiError apiError = buildApiError(HttpStatus.BAD_REQUEST, ex.getMessage());
-        return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
+    public ResponseEntity<ApiError> handleBadRequest(BadRequestException ex, HttpServletRequest req) {
+        return build(HttpStatus.BAD_REQUEST, ex.getMessage(), req);
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ApiError> handleDataIntegrity(DataIntegrityViolationException ex) {
-        logger.warn("DataIntegrityViolation: {}", ex.getMessage(), ex);
-        ApiError apiError = buildApiError(HttpStatus.CONFLICT, "Contrainte d'intégrité non respecté");
-        return new ResponseEntity<>(apiError, HttpStatus.CONFLICT);
+    public ResponseEntity<ApiError> handleConstraint(DataIntegrityViolationException ex, HttpServletRequest req) {
+        return build(HttpStatus.BAD_REQUEST, "Violation de contrainte en base de données.", req);
     }
 
-    @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException ex) {
-        logger.warn("AccessDenied: {}", ex.getMessage(), ex);
-        ApiError apiError = buildApiError(HttpStatus.FORBIDDEN, "Access refusé");
-        return new ResponseEntity<>(apiError, HttpStatus.FORBIDDEN);
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiError> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest req) {
+        String msg = ex.getBindingResult()
+                .getFieldErrors()
+                .stream()
+                .map(err -> err.getField() + " " + err.getDefaultMessage())
+                .collect(Collectors.joining("; "));
+        return build(HttpStatus.BAD_REQUEST, msg, req);
     }
 
-    @ExceptionHandler(RuntimeException.class)
-    public ResponseEntity<ApiError> handleAll(RuntimeException ex) {
-        logger.error("Unhandled exception", ex);
-        ApiError apiError = buildApiError(HttpStatus.INTERNAL_SERVER_ERROR, "Erreur Serveur");
-        return new ResponseEntity<>(apiError, HttpStatus.INTERNAL_SERVER_ERROR);
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiError> handleGeneric(Exception ex, HttpServletRequest req) {
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, "Erreur interne : " + ex.getMessage(), req);
+    }
+
+    private ResponseEntity<ApiError> build(HttpStatus status, String message, HttpServletRequest req) {
+        ApiError body = new ApiError(
+                OffsetDateTime.now(),
+                status.value(),
+                status.getReasonPhrase(),
+                message,
+                req.getRequestURI()
+        );
+        return ResponseEntity.status(status).body(body);
     }
 }
